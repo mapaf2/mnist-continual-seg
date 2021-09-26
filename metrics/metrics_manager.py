@@ -1,16 +1,19 @@
-from metrics import IoU, Acc
+from metrics import IoU, Acc, ConfusionMatrix
 
 class MetricsManager:
-  __implemented_metrics = ["iou", "acc"]
+  __implemented_metrics = ["iou", "acc", "confusion_matrix"]
 
-  def __init__(self, metrics):
-    self.metrics = [self._convert_metrics(m) for m in metrics]
+  def __init__(self, metrics, **kwargs):
+    print(kwargs)
+    self.metrics = [self._convert_metrics(m, **kwargs) for m in metrics]
     self.init_values()
 
-  def _convert_metrics(self, m):
+  def _convert_metrics(self, m, **kwargs):
     assert m in self.__implemented_metrics, f"Invalid metric, choose from {self.__implemented_metrics}"
-    _c_m_dict = {"iou": IoU(), 
-                 "acc": Acc()}
+    _c_m_dict = {"iou": IoU(**kwargs), 
+                 "acc": Acc(**kwargs),
+                 "confusion_matrix": ConfusionMatrix(**kwargs)
+    }
     return _c_m_dict[m]
 
   def init_values(self):

@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 class Metrics:
-  def __init__(self):
+  def __init__(self, **kwargs):
     pass
 
   def init_values(self):
@@ -15,7 +15,7 @@ class Metrics:
     pass
 
 class IoU(Metrics):
-  def __init__(self):
+  def __init__(self, **kwargs):
     self.init_values()
 
   def init_values(self):
@@ -29,8 +29,29 @@ class IoU(Metrics):
   def print(self):
     print("Foreground Mean IOU : ", np.sum(self.total_intersection)/np.sum(self.total_union))
 
+class ConfusionMatrix(Metrics):
+    def __init__(self, **kwargs):
+        self.n_classes = kwargs["n_classes"]
+        self.init_values()
+    
+    def init_values(self):
+        self.confusion_matrix = np.zeros((self.n_classes, self.n_classes))
+        
+    def update(self, predictions, labels):
+        pred_flat = predictions.flatten().numpy()
+        labels_flat = labels.flatten().numpy()
+        mask = (labels_flat >= 0) & (labels_flat < self.n_classes)
+        hist = np.bincount(
+                    self.n_classes * labels_flat[mask].astype(int) + pred_flat[mask],
+                    minlength=self.n_classes ** 2,
+                ).reshape(self.n_classes, self.n_classes)
+        self.confusion_matrix += hist
+        
+    def print(self):
+        print(self.confusion_matrix)
+        
 class Acc(Metrics):
-  def __init__(self):
+  def __init__(self, **kwargs):
     self.init_values()
 
   def init_values(self):
