@@ -25,7 +25,7 @@ class Metrics:
   def callbacks(self):
     pass
 
-  def create_animation(self):
+  def create_animation(self, filepath, sample_freq=1):
     pass
 
 class IoU(Metrics):
@@ -70,13 +70,17 @@ class ConfusionMatrix(Metrics):
     self.confusion_matrix += hist
         
   def print(self):
-    print(self.confusion_matrix)
+    self.show()
     
   def callbacks(self):
     self.save_matrix()
         
   def show(self, normalization_axis=1):
-    plt.imshow(self.confusion_matrix/np.sum(self.confusion_matrix, axis=normalization_axis, keepdims=True), cmap="jet")
+    plt.imshow(self.confusion_matrix/(np.sum(self.confusion_matrix, axis=normalization_axis, keepdims=True)+1e-6), cmap="jet")
+    plt.xlabel("Predicted")
+    plt.ylabel("Groundtruth")
+    plt.xticks(np.arange(11), ["bg"] + list(np.arange(10)))
+    plt.yticks(np.arange(11), ["bg"] + list(np.arange(10)))
     plt.show()
     
   def create_animation(self, filepath, sample_freq=1):
@@ -99,6 +103,42 @@ class ConfusionMatrix(Metrics):
     ani = animation.ArtistAnimation(fig, ims, interval=30, blit=True,
                                 repeat_delay=1000) 
     ani.save(filepath + ".mp4")
+    
+    
+    
+  def get_results(self):
+    """Returns accuracy score evaluation result.
+        - overall accuracy
+        - mean accuracy
+        - mean IU
+        - fwavacc
+    """
+    EPS = 1e-6
+    hist = self.confusion_matrix
+    
+    gt_sum = hist.sum(axis=1)
+    mask = (gt_sum != 0)
+    diag = np.diag(hist)
+    
+    acc = diag.sum() / hist.sum()
+    #print(diag[1:].sum(), hist[1:,:].sum())
+    acc_cls_c = diag / (gt_sum + EPS)
+    acc_cls = np.mean(acc_cls_c[mask])
+    iu = diag / (gt_sum + hist.sum(axis=0) - diag + EPS)
+    mean_iu = np.mean(iu[mask])
+    freq = hist.sum(axis=1) / hist.sum()
+    fwavacc = (freq[freq > 0] * iu[freq > 0]).sum()
+    cls_iu = dict(zip(range(self.n_classes), [iu[i] if m else "X" for i, m in enumerate(mask)]))
+    cls_acc = dict(zip(range(self.n_classes), [acc_cls_c[i] if m else "X" for i, m in enumerate(mask)]))
+    
+    return {
+            "Overall Acc": acc,
+            "Mean Acc": acc_cls,
+            "FreqW Acc": fwavacc,
+            "Mean IoU": mean_iu,
+            "Class IoU": cls_iu,
+            "Class Acc": cls_acc,
+        }
       
       
         
@@ -119,6 +159,7 @@ class Acc(Metrics):
     self.total_pixels += (labels!=0).sum().float().numpy()
 
   def print(self):
+    #print(np.sum(self.correct_pixels), self.total_pixels)
     print("Foreground pixels accuracy : ", self.get_values())#np.sum(self.correct_pixels)/self.total_pixels)
     
     
