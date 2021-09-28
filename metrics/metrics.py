@@ -84,6 +84,7 @@ class ConfusionMatrix(Metrics):
     fig, ax = plt.subplots()
     ims = []
     for i in range(0, len(self.all_matrices), sample_freq):
+      title = ax.text(2.5,-0.8, f"Step {i}")
       plt.xlabel("Predicted")
       plt.ylabel("Groundtruth")
       plt.xticks(np.arange(11), ["bg"] + list(np.arange(10)))
@@ -92,7 +93,8 @@ class ConfusionMatrix(Metrics):
       if i == 0:
         ax.imshow(self.all_matrices[i]/(np.sum(self.all_matrices[i], axis=1, keepdims=True)+1e-6), cmap="jet")
         
-      ims.append([im])
+      ims.append([im, title])
+      
       
     ani = animation.ArtistAnimation(fig, ims, interval=30, blit=True,
                                 repeat_delay=1000) 
