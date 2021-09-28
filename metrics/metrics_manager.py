@@ -4,7 +4,6 @@ class MetricsManager:
   __implemented_metrics = ["iou", "acc", "confusion_matrix"]
 
   def __init__(self, metrics, **kwargs):
-    print(kwargs)
     self.metrics = [self._convert_metrics(m, **kwargs) for m in metrics]
     self.init_values()
 
@@ -27,3 +26,17 @@ class MetricsManager:
   def print_metrics(self):
     for m in self.metrics:
       m.print()
+      
+  def show_metrics(self):
+    for m in self.metrics:
+      m.show()
+      
+  def get_metrics(self):
+    results = []
+    for m in self.metrics:
+      results.append(m.get_values())
+    return results
+    
+  def callbacks(self):
+    for m in self.metrics:
+      m.callbacks()     

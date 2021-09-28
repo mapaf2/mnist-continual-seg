@@ -1,5 +1,7 @@
 import numpy as np
 import torch
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
 class Metrics:
   def __init__(self, **kwargs):
@@ -8,10 +10,22 @@ class Metrics:
   def init_values(self):
     pass
 
+  def get_values(self):
+    pass
+
   def update(self, predictions, labels):
     pass
 
   def print(self):
+    pass
+
+  def show(self):
+    pass
+
+  def callbacks(self):
+    pass
+
+  def create_animation(self):
     pass
 
 class IoU(Metrics):
@@ -30,25 +44,61 @@ class IoU(Metrics):
     print("Foreground Mean IOU : ", np.sum(self.total_intersection)/np.sum(self.total_union))
 
 class ConfusionMatrix(Metrics):
-    def __init__(self, **kwargs):
-        self.n_classes = kwargs["n_classes"]
-        self.init_values()
+  def __init__(self, **kwargs):
+    self.n_classes = kwargs["n_classes"]
+    self.save_matrices = kwargs["save_matrices"] if "save_matrices" in kwargs else False
+    self.all_matrices = []
+    self.init_values()
     
-    def init_values(self):
-        self.confusion_matrix = np.zeros((self.n_classes, self.n_classes))
+  def init_values(self):
+    self.confusion_matrix = np.zeros((self.n_classes, self.n_classes))
+    
+  def get_values(self):
+    return self.confusion_matrix 
+    
+  def save_matrix(self):
+      self.all_matrices.append(np.copy(self.confusion_matrix))
         
-    def update(self, predictions, labels):
-        pred_flat = predictions.flatten().numpy()
-        labels_flat = labels.flatten().numpy()
-        mask = (labels_flat >= 0) & (labels_flat < self.n_classes)
-        hist = np.bincount(
-                    self.n_classes * labels_flat[mask].astype(int) + pred_flat[mask],
-                    minlength=self.n_classes ** 2,
-                ).reshape(self.n_classes, self.n_classes)
-        self.confusion_matrix += hist
+  def update(self, predictions, labels):
+    pred_flat = predictions.flatten().numpy()
+    labels_flat = labels.flatten().numpy()
+    mask = (labels_flat >= 0) & (labels_flat < self.n_classes)
+    hist = np.bincount(
+                self.n_classes * labels_flat[mask].astype(int) + pred_flat[mask],
+                minlength=self.n_classes ** 2,
+            ).reshape(self.n_classes, self.n_classes)
+    self.confusion_matrix += hist
         
-    def print(self):
-        print(self.confusion_matrix)
+  def print(self):
+    print(self.confusion_matrix)
+    
+  def callbacks(self):
+    self.save_matrix()
+        
+  def show(self, normalization_axis=1):
+    plt.imshow(self.confusion_matrix/np.sum(self.confusion_matrix, axis=normalization_axis, keepdims=True), cmap="jet")
+    plt.show()
+    
+  def create_animation(self, filepath, sample_freq=1):
+    plt.ioff()
+    fig, ax = plt.subplots()
+    ims = []
+    for i in range(0, len(self.all_matrices), sample_freq):
+      plt.xlabel("Predicted")
+      plt.ylabel("Groundtruth")
+      plt.xticks(np.arange(11), ["bg"] + list(np.arange(10)))
+      plt.yticks(np.arange(11), ["bg"] + list(np.arange(10)))
+      im = ax.imshow(self.all_matrices[i]/(np.sum(self.all_matrices[i], axis=1, keepdims=True)+1e-6), cmap="jet", animated=True)
+      if i == 0:
+        ax.imshow(self.all_matrices[i]/(np.sum(self.all_matrices[i], axis=1, keepdims=True)+1e-6), cmap="jet")
+        
+      ims.append([im])
+      
+    ani = animation.ArtistAnimation(fig, ims, interval=30, blit=True,
+                                repeat_delay=1000) 
+    ani.save(filepath + ".mp4")
+      
+      
         
 class Acc(Metrics):
   def __init__(self, **kwargs):
@@ -58,13 +108,16 @@ class Acc(Metrics):
     self.correct_pixels = 0
     self.total_pixels = 0
 
+  def get_values(self):
+    return np.sum(self.correct_pixels)/self.total_pixels
+
   def update(self, predictions, labels):
     c = ((predictions==labels) & (labels!=0)).float().cpu().numpy().sum()
     self.correct_pixels += c
     self.total_pixels += (labels!=0).sum().float().numpy()
 
   def print(self):
-    print("Foreground pixels accuracy : ", np.sum(self.correct_pixels)/self.total_pixels)
+    print("Foreground pixels accuracy : ", self.get_values())#np.sum(self.correct_pixels)/self.total_pixels)
     
     
 def iou_pytorch(outputs: torch.Tensor, labels: torch.Tensor):
