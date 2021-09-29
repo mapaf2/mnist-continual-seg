@@ -2,6 +2,12 @@ import torch
 from torch import nn
 from .backbones import simple_backbone
 from .decoders import simple_decoder
+from .memory import Memory
+
+      
+      
+    
+
 class simple_seg_model_memory(torch.nn.Module):
   def __init__(self,
                conv_filters=32,
