@@ -1,0 +1,1 @@
+from .continual_mnist import ContinualMnist
