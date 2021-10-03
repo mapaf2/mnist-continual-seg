@@ -29,6 +29,13 @@ class memory:
                                        self.masks_shape[1]))
                                         
     self.empty_slots = [0]*self.n_classes
+    
+  def process_batch(self, images, labels):
+    for im, lab in zip(images, labels):
+      c = list(np.unique(lab.cpu().numpy()))
+      c.remove(0)
+      c = np.random.choice(c)
+      self.save_memory(im, lab, c-1)
                                         
   def save_memory(self, image, mask, label):
     slot_class = self.empty_slots[label] 
