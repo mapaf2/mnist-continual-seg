@@ -109,6 +109,9 @@ class Trainer_distillation(Trainer):
                from_new_class,
                old_model=None,
                lambda_distill=0,
+               output_level_distill=False,
+               encoder_level_distill=False,
+               decoder_level_distill=False,
                curr_task=0,
                callbacks=[]):
                    
@@ -116,6 +119,9 @@ class Trainer_distillation(Trainer):
     self.from_new_class = from_new_class
     self.old_model = old_model
     self.lambda_distill = lambda_distill
+    self.output_level_distill = output_level_distill
+    self.encoder_level_distill = encoder_level_distill
+    self.decoder_level_distill = decoder_level_distill
     
   def _train_step(self, images, labels):
     if self.old_model is not None and self.lambda_distill != 0:
@@ -128,29 +134,51 @@ class Trainer_distillation(Trainer):
     
     self.optim.zero_grad()
     
-    new_outputs = self.model(images)
-    old_outputs = self.old_model(images)
+    new_enc, new_dec, new_outputs = self.model(images, return_intermediate=True)
+    old_enc, old_dec, old_outputs = self.old_model(images, return_intermediate=True)
     
     ce_loss = self._compute_loss(new_outputs, labels)
-    #print(ce_loss)
-    d_loss = self._distillation_loss(new_outputs, old_outputs, labels)
+    d_loss = self._distillation_loss(new_enc,
+                                     old_enc,
+                                     new_dec,
+                                     old_dec,
+                                     new_outputs,
+                                     old_outputs,
+                                     labels)
     loss = ce_loss + self.lambda_distill * d_loss
     loss.backward()
     self.optim.step()
     
     return ce_loss
     
-  def _distillation_loss(self, new_outputs, old_outputs, labels):
-    CRIT_LOSS = self._softXEnt#F.cross_entropy#nn.CrossEntropyLoss()
-    distill_loss =  CRIT_LOSS(new_outputs[:, :old_outputs.shape[1]], old_outputs)
+  def _distillation_loss(self,
+                         new_enc,
+                         old_enc,
+                         new_dec,
+                         old_dec,
+                         new_outputs,
+                         old_outputs,
+                         labels):
     
+    distill_loss = 0
+    
+    if self.output_level_distill:
+        distill_loss += self._softXEnt(new_outputs[:, :old_outputs.shape[1]], old_outputs)
+    if self.encoder_level_distill:
+        distill_loss += self._l2_feature_loss(new_enc, old_enc)
+    if self.decoder_level_distill:
+        distill_loss += self._l2_feature_loss(new_dec, old_dec)
+        
     return distill_loss
+    
+  def _l2_feature_loss(self, new_feats, old_feats):
+    L2_LOSS = nn.MSELoss()
+    feats_loss = L2_LOSS(new_feats, old_feats)
+    return feats_loss
     
   def next_task(self, n_classes_per_task):
     """Switch to next task."""
-    print("UPawfeDDD")
     self.from_new_class += self.n_classes[0]
-    print(self.from_new_class)
     self.n_classes_per_task = n_classes_per_task
     
     self.old_model = copy.deepcopy(self.model)
@@ -161,9 +189,11 @@ class Trainer_distillation(Trainer):
   def _softXEnt (self, input, target):
     logprobs = torch.nn.functional.log_softmax (input, dim = 1)[:,1:]
     target = torch.nn.functional.softmax (target, dim = 1)[:,1:]
-    #print(logprobs[0])
-    #print(target[0])
     return  -(target * logprobs).sum() / (input.shape[0] * input.shape[2] * input.shape[3])
+    
+    
+    
+    
     
 class GeneticTrainer(Trainer):
   def __init__(self,
