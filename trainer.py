@@ -1,13 +1,14 @@
 import torch
 import torch.nn as nn
-
+import torch.nn.functional as F
+import copy
 class Trainer:
   def __init__(self,
                model,
                n_classes,
                optim,
                curr_task=0,
-               callbacks=[]):#, evaluater=None):
+               callbacks=[]):
     self.model = model
     self.criterion = nn.CrossEntropyLoss()
     self.n_classes = n_classes
@@ -98,3 +99,86 @@ class Trainer:
 
   def set_callbacks(self, callbacks):
     self.callbacks = callbacks
+    
+    
+class Trainer_distillation(Trainer):
+  def __init__(self,
+               new_model,
+               n_classes,
+               optim,
+               from_new_class,
+               old_model=None,
+               lambda_distill=0,
+               curr_task=0,
+               callbacks=[]):
+                   
+    super(Trainer_distillation, self).__init__(new_model, n_classes, optim, curr_task, callbacks)
+    self.from_new_class = from_new_class
+    self.old_model = old_model
+    self.lambda_distill = lambda_distill
+    
+  def _train_step(self, images, labels):
+    if self.old_model is not None and self.lambda_distill != 0:
+        return self._train_step_distillation(images, labels)
+    else:
+        return super(Trainer_distillation, self)._train_step(images, labels)
+        
+  def _train_step_distillation(self, images, labels):
+    assert self.old_model is not None
+    
+    self.optim.zero_grad()
+    
+    new_outputs = self.model(images)
+    old_outputs = self.old_model(images)
+    
+    ce_loss = self._compute_loss(new_outputs, labels)
+    #print(ce_loss)
+    d_loss = self._distillation_loss(new_outputs, old_outputs, labels)
+    loss = ce_loss + self.lambda_distill * d_loss
+    loss.backward()
+    self.optim.step()
+    
+    return ce_loss
+    
+  def _distillation_loss(self, new_outputs, old_outputs, labels):
+    CRIT_LOSS = self._softXEnt#F.cross_entropy#nn.CrossEntropyLoss()
+    distill_loss =  CRIT_LOSS(new_outputs[:, :old_outputs.shape[1]], old_outputs)
+    
+    return distill_loss
+    
+  def next_task(self, n_classes_per_task):
+    """Switch to next task."""
+    print("UPawfeDDD")
+    self.from_new_class += self.n_classes[0]
+    print(self.from_new_class)
+    self.n_classes_per_task = n_classes_per_task
+    
+    self.old_model = copy.deepcopy(self.model)
+    new_model = self._load_new_model(self.n_classes_per_task)
+    self.model = new_model.cuda()
+    self.curr_task += 1
+    
+  def _softXEnt (self, input, target):
+    logprobs = torch.nn.functional.log_softmax (input, dim = 1)[:,1:]
+    target = torch.nn.functional.softmax (target, dim = 1)[:,1:]
+    #print(logprobs[0])
+    #print(target[0])
+    return  -(target * logprobs).sum() / (input.shape[0] * input.shape[2] * input.shape[3])
+    
+class GeneticTrainer(Trainer):
+  def __init__(self,
+               model,
+               n_classes,
+               optim,
+               curr_task=0,
+               callbacks=[]):
+    super(GeneticTrainer, self).__init__(model, n_classes, optim, curr_task, callbacks)
+    
+  def _train_step(self, images, labels):
+    features, outputs = self.model(images)
+    loss = self._compute_loss(outputs, labels)
+    
+    cls_in_images = torch.unique(labels)
+    #pos_features = features[]
+    
+  #def crossovers
