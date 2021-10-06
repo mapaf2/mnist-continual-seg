@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import copy
+from loss import UnbiasedKnowledgeDistillationLoss, UnbiasedCrossEntropy
+
 class Trainer:
   def __init__(self,
                model,
@@ -101,6 +103,97 @@ class Trainer:
     self.callbacks = callbacks
     
     
+class Trainer_MIB(Trainer):
+  def __init__(self,
+               new_model,
+               n_classes,
+               optim,
+               from_new_class,
+               old_model=None,
+               lambda_distill=0,
+               output_level_distill=False,
+               encoder_level_distill=False,
+               decoder_level_distill=False,
+               curr_task=0,
+               callbacks=[]):
+                   
+    super(Trainer_MIB, self).__init__(new_model, n_classes, optim, curr_task, callbacks)
+    self.from_new_class = from_new_class
+    self.old_model = old_model
+    self.lambda_distill = lambda_distill
+    self.output_level_distill = output_level_distill
+    self.encoder_level_distill = encoder_level_distill
+    self.decoder_level_distill = decoder_level_distill
+    
+  def _train_step(self, images, labels):
+    if self.old_model is not None and self.lambda_distill != 0:
+        return self._train_step_distillation(images, labels)
+    else:
+        return super(Trainer_MIB, self)._train_step(images, labels)
+        
+  def _train_step_distillation(self, images, labels):
+    assert self.old_model is not None
+    
+    self.optim.zero_grad()
+    
+    new_enc, new_dec, new_outputs = self.model(images, return_intermediate=True)
+    old_enc, old_dec, old_outputs = self.old_model(images, return_intermediate=True)
+    
+    ce_loss = self._compute_loss(new_outputs, labels)
+    d_loss = self._distillation_loss(new_enc,
+                                     old_enc,
+                                     new_dec,
+                                     old_dec,
+                                     new_outputs,
+                                     old_outputs,
+                                     labels)
+    loss = ce_loss + self.lambda_distill * d_loss
+    loss.backward()
+    self.optim.step()
+    
+    return ce_loss
+    
+  
+    
+  def _compute_loss(self, outputs, labels):
+    if self.old_model is not None:
+      #print(output.shape, labels.shape, self.from_new_class+1)
+      un_ce = UnbiasedCrossEntropy(old_cl=self.from_new_class+1)
+      #print(self.from_new_class-1, un_ce(outputs, labels), nn.CrossEntropyLoss()(outputs, labels))
+      return un_ce(outputs, labels)
+    else:
+      return super(Trainer_MIB, self)._compute_loss(outputs, labels)
+  def _distillation_loss(self,
+                         new_enc,
+                         old_enc,
+                         new_dec,
+                         old_dec,
+                         new_outputs,
+                         old_outputs,
+                         labels):
+    
+    distill_loss = 0
+    
+    if self.output_level_distill:
+      ukd_loss = UnbiasedKnowledgeDistillationLoss()
+      distill_loss += ukd_loss(new_outputs, old_outputs)
+    
+    return distill_loss
+    
+  def next_task(self, n_classes_per_task):
+    """Switch to next task."""
+    self.from_new_class += n_classes_per_task[-1]
+    self.n_classes_per_task = n_classes_per_task
+    
+    self.old_model = copy.deepcopy(self.model)
+    new_model = self._load_new_model(self.n_classes_per_task)
+    self.model = new_model.cuda()
+    self.curr_task += 1
+    
+    
+    
+    
+    
 class Trainer_distillation(Trainer):
   def __init__(self,
                new_model,
@@ -167,8 +260,9 @@ class Trainer_distillation(Trainer):
     if self.encoder_level_distill:
         distill_loss += self._l2_feature_loss(new_enc, old_enc)
     if self.decoder_level_distill:
-        distill_loss += self._l2_feature_loss(new_dec, old_dec)
-        
+        l = self._l2_feature_loss(new_dec, old_dec)
+        distill_loss += 0.1*l
+    
     return distill_loss
     
   def _l2_feature_loss(self, new_feats, old_feats):
@@ -178,7 +272,7 @@ class Trainer_distillation(Trainer):
     
   def next_task(self, n_classes_per_task):
     """Switch to next task."""
-    self.from_new_class += self.n_classes[0]
+    self.from_new_class += self.n_classes_per_task[-1]
     self.n_classes_per_task = n_classes_per_task
     
     self.old_model = copy.deepcopy(self.model)
