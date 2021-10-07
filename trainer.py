@@ -272,7 +272,7 @@ class Trainer_distillation(Trainer):
     
   def next_task(self, n_classes_per_task):
     """Switch to next task."""
-    self.from_new_class += self.n_classes_per_task[-1]
+    self.from_new_class += n_classes_per_task[-1]
     self.n_classes_per_task = n_classes_per_task
     
     self.old_model = copy.deepcopy(self.model)
