@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import copy
 from loss import UnbiasedKnowledgeDistillationLoss, UnbiasedCrossEntropy
+import matplotlib.pyplot as plt
+import numpy as np
 
 class Trainer:
   def __init__(self,
@@ -103,6 +105,94 @@ class Trainer:
     self.callbacks = callbacks
     
     
+class Trainer_PseudoLabel(Trainer):
+  def __init__(self,
+               new_model,
+               n_classes,
+               optim,
+               from_new_class,
+               old_model=None,
+               curr_task=0,
+               callbacks=[]):
+    super(Trainer_PseudoLabel, self).__init__(new_model, n_classes, optim, curr_task, callbacks)
+    self.from_new_class = from_new_class
+    self.old_model = old_model
+    
+  def _train_step(self, images, labels, im_labels=None):
+    if self.old_model is not None:
+      return self._train_step_pseudolabel(images, labels, im_labels)
+    else:
+      return super(Trainer_PseudoLabel, self)._train_step(images, labels)
+        
+  def _train_step_pseudolabel(self, images, labels, im_labels=None):
+    self.optim.zero_grad()
+    
+    new_outputs = self.model(images)
+    old_outputs = self.old_model(images)
+    
+    if im_labels is not None:
+      n_old_class = old_outputs.shape[1]
+      old_outputs[torch.logical_not(im_labels[:, :n_old_class])] = -1
+    
+    old_outputs_classif = torch.argmax(old_outputs, axis=1)
+    
+    aug_labels = torch.clone(labels)
+    mask_bg = labels == 0
+    aug_labels[mask_bg] = old_outputs_classif[mask_bg]
+    
+    loss = self._compute_loss(new_outputs, aug_labels)
+    
+    loss.backward()
+    self.optim.step()
+    
+    return loss
+    
+  def next_task(self, n_classes_per_task):
+    """Switch to next task."""
+    self.from_new_class += n_classes_per_task[-1]
+    self.n_classes_per_task = n_classes_per_task
+    
+    self.old_model = copy.deepcopy(self.model)
+    new_model = self._load_new_model(self.n_classes_per_task)
+    self.model = new_model.cuda()
+    self.curr_task += 1
+    
+    
+    
+class Trainer_PseudoLabel_ImageLabels(Trainer_PseudoLabel):
+  def __init__(self,
+               new_model,
+               n_classes,
+               optim,
+               from_new_class,
+               old_model=None,
+               curr_task=0,
+               callbacks=[]):
+    super(Trainer_PseudoLabel_ImageLabels, self).__init__(new_model,
+                                                           n_classes,
+                                                           optim,
+                                                           from_new_class,
+                                                           old_model,
+                                                           curr_task,
+                                                           callbacks)
+    
+  def train(self, 
+            cur_epoch,
+            scenario,
+            memory=None,
+            sample_memory=False):
+    """Train for 1 epoch."""
+    epoch_loss = 0
+    for cur_step, (images, labels, image_labels) in enumerate(scenario.train_stream):
+      images, labels, image_labels = images.cuda().float(), labels.cuda().long(), image_labels.cuda()
+      epoch_loss += self._train_step(images, labels, image_labels)
+      self._apply_callbacks(scenario, freq="step")
+    self._apply_callbacks(scenario, freq="epoch")
+    return epoch_loss / len(scenario.train_stream)
+    
+    
+    
+    
 class Trainer_MIB(Trainer):
   def __init__(self,
                new_model,
@@ -127,9 +217,9 @@ class Trainer_MIB(Trainer):
     
   def _train_step(self, images, labels):
     if self.old_model is not None and self.lambda_distill != 0:
-        return self._train_step_distillation(images, labels)
+      return self._train_step_distillation(images, labels)
     else:
-        return super(Trainer_MIB, self)._train_step(images, labels)
+      return super(Trainer_MIB, self)._train_step(images, labels)
         
   def _train_step_distillation(self, images, labels):
     assert self.old_model is not None
@@ -153,16 +243,13 @@ class Trainer_MIB(Trainer):
     
     return ce_loss
     
-  
-    
   def _compute_loss(self, outputs, labels):
     if self.old_model is not None:
-      #print(output.shape, labels.shape, self.from_new_class+1)
       un_ce = UnbiasedCrossEntropy(old_cl=self.from_new_class+1)
-      #print(self.from_new_class-1, un_ce(outputs, labels), nn.CrossEntropyLoss()(outputs, labels))
       return un_ce(outputs, labels)
     else:
       return super(Trainer_MIB, self)._compute_loss(outputs, labels)
+      
   def _distillation_loss(self,
                          new_enc,
                          old_enc,
@@ -218,9 +305,9 @@ class Trainer_distillation(Trainer):
     
   def _train_step(self, images, labels):
     if self.old_model is not None and self.lambda_distill != 0:
-        return self._train_step_distillation(images, labels)
+      return self._train_step_distillation(images, labels)
     else:
-        return super(Trainer_distillation, self)._train_step(images, labels)
+      return super(Trainer_distillation, self)._train_step(images, labels)
         
   def _train_step_distillation(self, images, labels):
     assert self.old_model is not None

@@ -9,14 +9,15 @@ class ContinualMnist:
                n_train,
                n_test,
                batch_size,
-               tasks):
+               tasks,
+               return_im_level_label=False):
   
     self.tasks = tasks
     self.n_classes_per_task = [len(t) for _, t in self.tasks.items()]
     self.n_classes_per_task[0] +=1 # Include background
     self.batch_size = batch_size
     self.train_x, self.train_y, self.test_x, self.test_y = self._process_dataset(n_train, n_test)
-    self.train_data = ContinualMnistExtended(self.train_x, self.train_y, self.tasks)
+    self.train_data = ContinualMnistExtended(self.train_x, self.train_y, self.tasks, return_im_level_label=return_im_level_label)
     self.train_stream = data.DataLoader(self.train_data, batch_size=self.batch_size, shuffle=True)
     self.test_data = ContinualMnistExtended(self.test_x, self.test_y, self.tasks, replace=False)
     self.test_stream = data.DataLoader(self.test_data, batch_size=self.batch_size)
