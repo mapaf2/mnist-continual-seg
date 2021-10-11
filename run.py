@@ -2,7 +2,7 @@ import argparser
 import os
 import sys
 sys.path.append("/content/gdrive/MyDrive/Colab Notebooks/simple_deep_learning")
-from trainer import Trainer, Trainer_distillation, Trainer_MIB, Trainer_PseudoLabel
+from trainer import Trainer, Trainer_distillation, Trainer_MIB, Trainer_PseudoLabel, Trainer_PseudoLabel_ImageLabels
 from metrics import EvaluaterCallback
 from scenarios import ContinualMnist
 from models import simple_seg_model
@@ -35,7 +35,9 @@ def init_trainer(opts, **kwargs):
   trainers = {"naive": Trainer,
               "distillation": Trainer_distillation,
               "mib": Trainer_MIB,
-              "pseudo_label": Trainer_PseudoLabel}
+              "pseudo_label": Trainer_PseudoLabel,
+              "pseudo_label_image": Trainer_PseudoLabel_ImageLabels
+  }
   trainer_constructor = trainers[opts.method] 
   trainer = trainer_constructor(**kwargs)
   return trainer
@@ -43,7 +45,12 @@ def init_trainer(opts, **kwargs):
 if __name__ == '__main__':
   parser = argparser.get_argparser()
   opts = parser.parse_args()
+  
+  torch.manual_seed(opts.random_seed)
+  torch.cuda.manual_seed(opts.random_seed)
+  np.random.seed(opts.random_seed)
 
+  opts.return_im_level_label = opts.method in ["pseudo_label_image"]
   opts.experiments_path = get_experiments_path(opts)
   os.makedirs(opts.experiments_path, exist_ok=opts.override_experiment)
   
@@ -53,7 +60,11 @@ if __name__ == '__main__':
   
   optimizer = torch.optim.Adam(lr = 0.0005, params=model.parameters())
 
-  continual_mnist = ContinualMnist(n_train=opts.n_train, n_test=opts.n_test, batch_size=opts.batch_size, tasks=tasks)
+  continual_mnist = ContinualMnist(n_train=opts.n_train,
+                                   n_test=opts.n_test,
+                                   batch_size=opts.batch_size,
+                                   tasks=tasks,
+                                   return_im_level_label=opts.return_im_level_label)
   evaluater = EvaluaterCallback(model, ["confusion_matrix"], callback_frequency="epoch", n_classes=11, save_matrices=True)
   trainer = init_trainer(opts,
                          model=model,
