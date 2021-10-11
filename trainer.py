@@ -12,7 +12,8 @@ class Trainer:
                n_classes,
                optim,
                curr_task=0,
-               callbacks=[]):
+               callbacks=[],
+               **kwargs):
     self.model = model
     self.criterion = nn.CrossEntropyLoss()
     self.n_classes = n_classes
@@ -107,14 +108,14 @@ class Trainer:
     
 class Trainer_PseudoLabel(Trainer):
   def __init__(self,
-               new_model,
+               model,
                n_classes,
                optim,
                from_new_class,
                old_model=None,
                curr_task=0,
                callbacks=[]):
-    super(Trainer_PseudoLabel, self).__init__(new_model, n_classes, optim, curr_task, callbacks)
+    super(Trainer_PseudoLabel, self).__init__(model, n_classes, optim, curr_task, callbacks)
     self.from_new_class = from_new_class
     self.old_model = old_model
     
@@ -140,6 +141,7 @@ class Trainer_PseudoLabel(Trainer):
     mask_bg = labels == 0
     aug_labels[mask_bg] = old_outputs_classif[mask_bg]
     
+    
     loss = self._compute_loss(new_outputs, aug_labels)
     
     loss.backward()
@@ -161,14 +163,14 @@ class Trainer_PseudoLabel(Trainer):
     
 class Trainer_PseudoLabel_ImageLabels(Trainer_PseudoLabel):
   def __init__(self,
-               new_model,
+               model,
                n_classes,
                optim,
                from_new_class,
                old_model=None,
                curr_task=0,
                callbacks=[]):
-    super(Trainer_PseudoLabel_ImageLabels, self).__init__(new_model,
+    super(Trainer_PseudoLabel_ImageLabels, self).__init__(model,
                                                            n_classes,
                                                            optim,
                                                            from_new_class,
@@ -195,7 +197,7 @@ class Trainer_PseudoLabel_ImageLabels(Trainer_PseudoLabel):
     
 class Trainer_MIB(Trainer):
   def __init__(self,
-               new_model,
+               model,
                n_classes,
                optim,
                from_new_class,
@@ -207,7 +209,7 @@ class Trainer_MIB(Trainer):
                curr_task=0,
                callbacks=[]):
                    
-    super(Trainer_MIB, self).__init__(new_model, n_classes, optim, curr_task, callbacks)
+    super(Trainer_MIB, self).__init__(model, n_classes, optim, curr_task, callbacks)
     self.from_new_class = from_new_class
     self.old_model = old_model
     self.lambda_distill = lambda_distill
@@ -283,7 +285,7 @@ class Trainer_MIB(Trainer):
     
 class Trainer_distillation(Trainer):
   def __init__(self,
-               new_model,
+               model,
                n_classes,
                optim,
                from_new_class,
@@ -295,7 +297,7 @@ class Trainer_distillation(Trainer):
                curr_task=0,
                callbacks=[]):
                    
-    super(Trainer_distillation, self).__init__(new_model, n_classes, optim, curr_task, callbacks)
+    super(Trainer_distillation, self).__init__(model, n_classes, optim, curr_task, callbacks)
     self.from_new_class = from_new_class
     self.old_model = old_model
     self.lambda_distill = lambda_distill
