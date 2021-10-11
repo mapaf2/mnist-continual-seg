@@ -114,7 +114,8 @@ class Trainer_PseudoLabel(Trainer):
                from_new_class,
                old_model=None,
                curr_task=0,
-               callbacks=[]):
+               callbacks=[],
+               **kwargs):
     super(Trainer_PseudoLabel, self).__init__(model, n_classes, optim, curr_task, callbacks)
     self.from_new_class = from_new_class
     self.old_model = old_model
@@ -169,7 +170,8 @@ class Trainer_PseudoLabel_ImageLabels(Trainer_PseudoLabel):
                from_new_class,
                old_model=None,
                curr_task=0,
-               callbacks=[]):
+               callbacks=[],
+               **kwargs):
     super(Trainer_PseudoLabel_ImageLabels, self).__init__(model,
                                                            n_classes,
                                                            optim,
@@ -207,7 +209,8 @@ class Trainer_MIB(Trainer):
                encoder_level_distill=False,
                decoder_level_distill=False,
                curr_task=0,
-               callbacks=[]):
+               callbacks=[],
+               **kwargs):
                    
     super(Trainer_MIB, self).__init__(model, n_classes, optim, curr_task, callbacks)
     self.from_new_class = from_new_class

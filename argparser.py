@@ -9,6 +9,7 @@ def get_argparser():
   parser.add_argument("--n_test", type=int, default=2500)
   parser.add_argument("--batch_size", type=int, default=72)
   parser.add_argument("--epochs", type=int, default=200)
+  parser.add_arugment("--random_seed", type=int, default=42)
     
   # Methods  
   #parser.add_argument("--encoder", type=str,
@@ -17,7 +18,8 @@ def get_argparser():
   parser.add_argument("--method", type=str, choices=["naive", 
                                                      "distillation",
                                                      "mib",
-                                                     "pseudo_label"])
+                                                     "pseudo_label",
+                                                     "pseudo_label_image"])
            
   # Distillation specific hyperparameters                                          
   parser.add_argument("--distillation", type=bool, default=False)    
