@@ -73,7 +73,8 @@ class ConfusionMatrix(Metrics):
     self.show()
     
   def callbacks(self):
-    self.save_matrix()
+    if self.save_matrices:
+        self.save_matrix()
         
   def show(self, normalization_axis=1):
     plt.imshow(self.confusion_matrix/(np.sum(self.confusion_matrix, axis=normalization_axis, keepdims=True)+1e-6), cmap="jet")

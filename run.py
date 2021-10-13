@@ -9,6 +9,7 @@ from models import simple_seg_model
 import torch
 from utils import increment_task, meta_train
 import contextlib
+import numpy as np
 
 _tasks = {"2-2": {0: [0,1], 1: [2,3], 2: [4,5], 3: [6,7], 4: [8,9]}}
 
@@ -65,7 +66,7 @@ if __name__ == '__main__':
                                    batch_size=opts.batch_size,
                                    tasks=tasks,
                                    return_im_level_label=opts.return_im_level_label)
-  evaluater = EvaluaterCallback(model, ["confusion_matrix"], callback_frequency="epoch", n_classes=11, save_matrices=True)
+  evaluater = EvaluaterCallback(model, ["confusion_matrix"], callback_frequency="task", n_classes=11, save_matrices=False)
   trainer = init_trainer(opts,
                          model=model,
                          n_classes=[3],

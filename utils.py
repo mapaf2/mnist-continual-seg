@@ -64,6 +64,7 @@ def meta_train(n_tasks,
       for i in tqdm(range(epochs)):
         trainer.train(i, scenario, memory, sample_memory=sample_memory)
 
+    trainer._apply_callbacks(scenario, freq="task")
     _print_results()
     
     torch.save(trainer.model.state_dict(), f"checkpoints/task-{trainer.curr_task}.pth")
@@ -71,6 +72,6 @@ def meta_train(n_tasks,
     if t < n_tasks - 1:
       _print_new_task()    
       increment_task(scenario = scenario, trainer = trainer, evaluater = evaluater, memory = memory)
-  evaluater.create_animation(animation_path, sample_freq=4)
+  #evaluater.create_animation(animation_path, sample_freq=4)
 
   
