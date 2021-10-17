@@ -41,15 +41,19 @@ class self_attention_cam(nn.Module):
 
         if self.linformer:
             value = F.interpolate(value, ((h // self.factor + 1), (w // self.factor + 1)), mode="bilinear", align_corners=True)
-        
         value = torch.reshape(value, [batch_size, value.shape[1], -1])
         value = value.permute(0,2,1)
         att_score = torch.matmul(att_weights, value)
         att_score = torch.reshape(att_score.permute(0,2,1), logits.shape)
         att_score += logits
-        
-        if self.linformer:
-            att_score = F.interpolate(att_score, (h, w))
+        if att_score.shape[1] != self.num_class:
+            # Set an initial score for the background class. Since the score range of a
+            # class is [0, 2] after skip-connection, we use 2 minus the max class
+            # probability to set the initial background score for each pixel.
+            bg = 2 - torch.amax(att_score, dim=1, keepdims=True)
+            att_score = torch.cat([bg, att_score], dim=1)
+        #if self.linformer:
+        #    att_score = F.interpolate(att_score, (h, w))
         
         out = self.bn(self.out_layer(att_score))
         

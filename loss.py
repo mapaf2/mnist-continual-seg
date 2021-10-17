@@ -25,10 +25,11 @@ class UnbiasedCrossEntropy(nn.Module):
         return loss
 
 class UnbiasedKnowledgeDistillationLoss(nn.Module):
-    def __init__(self, reduction='mean', alpha=1.):
+    def __init__(self, reduction='mean', alpha=1., apply_softmax=True):
         super().__init__()
         self.reduction = reduction
         self.alpha = alpha
+        self.apply_softmax = apply_softmax
 
     def forward(self, inputs, targets, mask=None):
 
@@ -42,19 +43,19 @@ class UnbiasedKnowledgeDistillationLoss(nn.Module):
         outputs_no_bgk = inputs[:, 1:-new_cl] - den.unsqueeze(dim=1)  # B, OLD_CL, H, W
         outputs_bkg = torch.logsumexp(torch.index_select(inputs, index=new_bkg_idx, dim=1), dim=1) - den     # B, H, W
 
-        labels = torch.softmax(targets, dim=1)                        # B, BKG + OLD_CL, H, W
+        labels = torch.softmax(targets, dim=1) if self.apply_softmax else targets                   # B, BKG + OLD_CL, H, W
 
         # make the average on the classes 1/n_cl \sum{c=1..n_cl} L_c
         loss = (labels[:, 0] * outputs_bkg + (labels[:, 1:] * outputs_no_bgk).sum(dim=1)) / targets.shape[1]
 
         if mask is not None:
-            loss = loss * mask.float()
+          loss = loss * mask.float()
 
         if self.reduction == 'mean':
-                outputs = -torch.mean(loss)
+          outputs = -torch.mean(loss)
         elif self.reduction == 'sum':
-                outputs = -torch.sum(loss)
+          outputs = -torch.sum(loss)
         else:
-            outputs = -loss
+          outputs = -loss
 
         return outputs

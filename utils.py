@@ -63,11 +63,12 @@ def meta_train(n_tasks,
     if t > 0 or not pass_first_step:
       for i in tqdm(range(epochs)):
         trainer.train(i, scenario, memory, sample_memory=sample_memory)
-
+      torch.save(trainer.model.state_dict(), f"checkpoints/task-{trainer.curr_task}.pth")
+    trainer.model.load_state_dict(torch.load(f"checkpoints/task-{trainer.curr_task}.pth"))
     trainer._apply_callbacks(scenario, freq="task")
     _print_results()
     
-    torch.save(trainer.model.state_dict(), f"checkpoints/task-{trainer.curr_task}.pth")
+    
 
     if t < n_tasks - 1:
       _print_new_task()    

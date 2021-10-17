@@ -16,7 +16,7 @@ class Trainer:
                **kwargs):
     self.model = model
     self.criterion = nn.CrossEntropyLoss()
-    self.n_classes = n_classes
+    self.n_classes_per_task = n_classes
     self.optim = optim
     self.curr_task = curr_task
     self.callbacks = callbacks
@@ -73,8 +73,18 @@ class Trainer:
     new_model = self._load_new_model(self.n_classes_per_task)
     self.model = new_model.cuda()
     self.curr_task += 1
+    
+  def _manual_load(self, past_checkpoint, new_model):
+    for layer in past_checkpoint:
+      if layer in new_model.state_dict():
+        n_subset = [slice(None, past_checkpoint[layer].shape[i]) for i in range(len(past_checkpoint[layer].shape))]
+        if len(n_subset) > 0 :
+            new_model.state_dict()[layer][[sub for sub in n_subset]]  = past_checkpoint[layer]
+    return new_model
 
-  def _load_new_model(self, n_classes_per_task):
+  def _load_new_model(self,
+                      n_classes_per_task,
+                      load_as_before=False):
     """
     Helper function to create new model and
      load weights of past training.
@@ -82,13 +92,16 @@ class Trainer:
     new_model = self._make_model(n_classes_per_task)
     path_weights = self._get_path_weights()
     step_checkpoint = torch.load(path_weights, map_location="cpu")
-    new_model.load_state_dict(step_checkpoint, strict=False)
+    if load_as_before:
+      new_model.load_state_dict(step_checkpoint, strict=False)
+    else:
+      new_model = self._manual_load(step_checkpoint, new_model)    
     return new_model
 
   def _make_model(self, n_classes_per_task):
     """Helper function to create new model."""
     m_constructor = type(self.model)
-    new_model = m_constructor(n_classes_per_task=n_classes_per_task)
+    new_model = m_constructor(conv_filters = self.model.conv_filters, n_classes_per_task=n_classes_per_task)
     return new_model
 
   def _get_path_weights(self):
