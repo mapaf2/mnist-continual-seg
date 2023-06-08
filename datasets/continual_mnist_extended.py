@@ -4,13 +4,13 @@ import torch
 import numpy as np
 
 class ContinualMnistExtended(data.Dataset):
-  def __init__(self, X, y, tasks: dict, replace=True, return_im_level_label=False):
+  def __init__(self, X, y, tasks: dict, replace=True, curr_task_id = 0, return_im_level_label=False):
     self.X = X
     self.y = y
     self.classes = np.arange(self.y.shape[-1])
     self.tasks = tasks
     self.replace = replace
-    self.curr_task_id = 0
+    self.curr_task_id = curr_task_id
     self.curr_classes = [0] + [t+1 for t in self.tasks[self.curr_task_id]]
     self.curr_X, self.curr_y, self.curr_im_level_labels = self.get_curr_Xy()
     self.seen_classes = []
